@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>All Info As Text Config</title>
+  </head>
+  <body>
+    <h1>All Info As Text Config</h1>
+    <p>Choose settings:</p>
+
+    <p>Temperature Units:
+    <select id="key_temperature_units_select">
+      <option value="F">F</option>
+      <option value="C">C</option>
+    </select>
+    </p>
+
+    <p>Windspeed Units:
+    <select id="key_windspeed_units_select">
+      <option value="KNOTS">Knots</option>
+      <option value="MPH">MPH</option>
+      <option value="KPH">KM/HR</option>
+    </select>
+    </p>
+
+    <p>Week Number (replaces seconds):
+    <select id="key_weeknumber_enabled_select">
+      <option value="DISABLED">Disabled</option>
+      <option value="ENABLED">Enabled</option>
+    </select>
+    </p>
+
+    <p>
+    <button id="save_button">Save</button>
+    </p>
+
+    <script>
+      //Setup to allow easy adding more options later
+      function saveOptions() {
+        var temperatureUnits = document.getElementById("key_temperature_units_select");
+        var options = {
+          "temperatureUnits": temperatureUnits.options[temperatureUnits.selectedIndex].value
+        }
+
+        var windspeedUnits = document.getElementById("key_windspeed_units_select");
+        var options = {
+          "windspeedUnits": windspeedUnits.options[windspeedUnits.selectedIndex].value
+        }
+        
+        var weekNumberEnabled = document.getElementById("key_weeknumber_enabled_select");
+        var options = {
+          "weekNumberEnabled": weekNumberEnabled.options[weekNumberEnabled.selectedIndex].value
+        }
+        
+        return options;
+      };
+      
+      var submitButton = document.getElementById("save_button");
+      submitButton.addEventListener("click", 
+        function() {
+          console.log("Submit");
+          var options = saveOptions();
+          var location = "pebblejs://close#" + encodeURIComponent(JSON.stringify(options));
+          
+          document.location = location;
+        }, 
+      false);
+    </script>
+  </body>
+</html>
