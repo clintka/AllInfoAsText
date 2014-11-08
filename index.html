@@ -7,6 +7,8 @@
     <h1>All Info As Text Config</h1>
     <p>Choose settings:</p>
 
+    <p>Please note: Opening this page always displays the default watch settings.</p>
+
     <p>Temperature Units:
     <select id="key_temperature_units_select">
       <option value="F">F</option>
@@ -29,6 +31,13 @@
     </select>
     </p>
 
+    <p>First day of the week:
+    <select id="key_mondayFirst_select">
+      <option value="SUNDAY">Sunday</option>
+      <option value="MONDAY">Monday</option>
+    </select>
+    </p>
+
     <p>
     <button id="save_button">Save</button>
     </p>
@@ -39,10 +48,12 @@
         var temperatureUnits = document.getElementById("key_temperature_units_select");
         var windspeedUnits = document.getElementById("key_windspeed_units_select");
         var weekNumberEnabled = document.getElementById("key_weeknumber_enabled_select");
+        var mondayFirst = document.getElementById("key_mondayFirst_select");
         var options = {
           "temperatureUnits": temperatureUnits.options[temperatureUnits.selectedIndex].value,
           "windspeedUnits": windspeedUnits.options[windspeedUnits.selectedIndex].value,
-          "weekNumberEnabled": weekNumberEnabled.options[weekNumberEnabled.selectedIndex].value
+          "weekNumberEnabled": weekNumberEnabled.options[weekNumberEnabled.selectedIndex].value,
+          "mondayFirst": mondayFirst.options[mondayFirst.selectedIndex].value
         }
 
         return options;
