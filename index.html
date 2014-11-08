@@ -37,20 +37,14 @@
       //Setup to allow easy adding more options later
       function saveOptions() {
         var temperatureUnits = document.getElementById("key_temperature_units_select");
-        var options = {
-          "temperatureUnits": temperatureUnits.options[temperatureUnits.selectedIndex].value
-        }
-
         var windspeedUnits = document.getElementById("key_windspeed_units_select");
-        var options = {
-          "windspeedUnits": windspeedUnits.options[windspeedUnits.selectedIndex].value
-        }
-        
         var weekNumberEnabled = document.getElementById("key_weeknumber_enabled_select");
         var options = {
+          "temperatureUnits": temperatureUnits.options[temperatureUnits.selectedIndex].value,
+          "windspeedUnits": windspeedUnits.options[windspeedUnits.selectedIndex].value,
           "weekNumberEnabled": weekNumberEnabled.options[weekNumberEnabled.selectedIndex].value
         }
-        
+
         return options;
       };
       
