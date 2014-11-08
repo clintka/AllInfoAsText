@@ -188,3 +188,36 @@ Pebble.addEventListener('appmessage',
     getWeather();
   }                     
 );
+
+Pebble.addEventListener("showConfiguration",
+  function(e) {
+    Pebble.openURL("http://clintka.github.io/AllInfoAsText/index.html");
+  }
+);
+
+Pebble.addEventListener("webviewclosed",
+  function(e) {
+    //Get JSON dictionary
+    var configuration = JSON.parse(decodeURIComponent(e.response));
+    //console.log("Configuration window returned: " + JSON.stringify(configuration));
+ 
+    // Assemble dictionary using our keys
+    var dictionary = {
+      "CONFIG_KEY_TEMPERATURE_UNITS": configuration.temperatureUnits,
+      "CONFIG_KEY_WINDSPEED_UNITS": configuration.windspeedUnits,
+      "CONFIG_KEY_WEEKNUMBER_ENABLED": configuration.weekNumberEnabled,
+      "CONFIG_KEY_MONDAY_FIRST": configuration.mondayFirst
+      };
+
+      // Send to Pebble
+      Pebble.sendAppMessage(dictionary,
+        function(e) {
+          //console.log("Config info sent to Pebble successfully!");
+        },
+        function(e) {
+          //console.log("Error sending config info to Pebble!");
+        }
+      );
+
+  }
+);

@@ -22,6 +22,12 @@
 #define KEY_DAY3_TEMP_MAX 18
 #define KEY_DAY3_TIME 19
 
+// Keys for configuration.
+#define CONFIG_KEY_TEMPERATURE_UNITS 50
+#define CONFIG_KEY_WINDSPEED_UNITS 51
+#define CONFIG_KEY_WEEKNUMBER_ENABLED 52
+#define CONFIG_KEY_MONDAY_FIRST 53
+
 // Keys to reference persistent storage.
 #define STORAGE_KEY_CURRENT_TEMPERATURE_C 100
 #define STORAGE_KEY_CURRENT_CONDITIONS 101
@@ -34,12 +40,26 @@
 #define STORAGE_KEY_FORECAST_HIGH_C 108
 #define STORAGE_KEY_FORECAST_CONDITIONS 109
 #define STORAGE_KEY_CURRENT_DAY_FORECAST_CONDITIONS 110
+#define STORAGE_KEY_TEMPERATURE_UNITS 111
+#define STORAGE_KEY_WINDSPEED_UNITS 112
+#define STORAGE_KEY_WEEKNUMBER_ENABLED 113
+#define STORAGE_KEY_MONDAY_FIRST 114
 
 // Durations for updates and time outs. Set as desired.
 #define NUMBER_OF_SECONDS_BETWEEN_WEATHER_UPDATES 1800
 #define NUMBER_OF_SECONDS_UNTIL_DATA_CONSIDERED_LOST 60
 #define NUMBER_OF_SECONDS_TO_SHOW_SECONDS_AFTER_TAP 180
 
+#define TEMPERATURE_UNITS_F 0
+#define TEMPERATURE_UNITS_C 1
+  
+#define WINDSPEED_UNITS_KNOTS 0
+#define WINDSPEED_UNITS_MPH 1
+#define WINDSPEED_UNITS_KPH 2
+  
+#define FALSE 0
+#define TRUE 1
+  
 // Persistent storage variables (must be global).
 static int currentTemperature_c;
 static char currentConditions[32];
@@ -52,6 +72,10 @@ static int currentDate;
 static int forecastLowTemperature_c;
 static int forecastHighTemperature_c;
 static char forecastConditions[32];
+static int temperatureUnits; // 0 = F, 1 = C
+static int windSpeedUnits; // 0 = KNOTS, 1 = MPH, 2 = KPH
+static int weekNumberEnabled; // 0 = FALSE, 1 = TRUE
+static int mondayFirst; // 0 = FALSE, 1 = TRUE
 
 // Status variables.
 bool isShowingSeconds = false;
@@ -85,6 +109,22 @@ static float getFahrenheitFromCelsius(float temp_celsius)
 static float getKnotsFromMetersPerSecond(float speed_metersPerSecond)
 {
   return (speed_metersPerSecond * 1.94384);
+}
+
+static float getPreferedWindSpeed(float windSpeed_kts)
+{
+  switch(windSpeedUnits)
+  {
+    case WINDSPEED_UNITS_KNOTS:
+      return windSpeed_kts;
+    case WINDSPEED_UNITS_MPH:
+      return (windSpeed_kts * 1.15077945);
+    case WINDSPEED_UNITS_KPH:
+      return (windSpeed_kts * 1.85200);    
+  }
+  
+  // Invalid windspeed units.
+  return windSpeed_kts;
 }
 
 static void update_link_label()
@@ -139,13 +179,29 @@ static void update_time(struct tm *tick_time)
     strftime(timeBuffer, sizeof("00:00"), "%l:%M", tick_time);
     text_layer_set_text(s_time_layer, timeBuffer);
   
-    if (isShowingSeconds)
+    if (weekNumberEnabled == TRUE)
     {
+      // Show Week Number in place of the seconds field.
+      if (mondayFirst == TRUE)
+      {
+        strftime(timeSecondsBuffer, sizeof("00"), "%W", tick_time);
+        text_layer_set_text(s_time_seconds_layer, timeSecondsBuffer);
+      }
+      else
+      {
+        strftime(timeSecondsBuffer, sizeof("00"), "%U", tick_time);
+        text_layer_set_text(s_time_seconds_layer, timeSecondsBuffer);
+      }
+    }
+    else if (isShowingSeconds)
+    {
+      // isShowingSeconds is toggled by a watch bump to save battery.
       strftime(timeSecondsBuffer, sizeof("00"), "%S", tick_time);
       text_layer_set_text(s_time_seconds_layer, timeSecondsBuffer);
     }
     else
     {
+      // Clear out the seconds field.
       timeSecondsBuffer[0] = 0;
       text_layer_set_text(s_time_seconds_layer, timeSecondsBuffer);
     }
@@ -177,12 +233,11 @@ static void update_date(struct tm *tick_time)
 
   // Update the Calendar
   char dayOfWeekString[2];
-  strftime(dayOfWeekString, sizeof(dayOfWeekString), "%u", tick_time);
+  strftime(dayOfWeekString, sizeof(dayOfWeekString), "%w", tick_time);
   int dayOfWeek = atoi(dayOfWeekString);
-  if (dayOfWeek == 7)
+  if (mondayFirst == TRUE)
   {
-    // Correct for Sunday
-    dayOfWeek = 0;
+    dayOfWeek = dayOfWeek - 1;
   }
   
   // Subtract back to Sunday of this week.
@@ -218,45 +273,56 @@ static void update_weather()
   static char day2_layer_buffer[64];
 
   // Update Current Weather Condition
+  char currentTemperatureString[10];
+  switch(temperatureUnits)
+  {
+    case TEMPERATURE_UNITS_F:
+      snprintf(currentTemperatureString, sizeof(currentTemperatureString), "%dF",
+          (int)getFahrenheitFromCelsius(currentTemperature_c));     
+      break;
+    case TEMPERATURE_UNITS_C:
+      snprintf(currentTemperatureString, sizeof(currentTemperatureString), "%dC",
+          currentTemperature_c);     
+      break;
+  }
   char windDirectionString[3];
   if (currentWindDirection_deg >= 337.5 || currentWindDirection_deg <= 22.5)
   {
     strcpy(windDirectionString, "N");    
   }
-  else if (currentWindDirection_deg > 22.5 || currentWindDirection_deg < 67.5)
+  else if (currentWindDirection_deg < 67.5) // currentWindDirection_deg > 22.5 &&
   {
     strcpy(windDirectionString, "NE");    
   }
-  else if (currentWindDirection_deg >= 67.5 || currentWindDirection_deg <= 112.5)
+  else if (currentWindDirection_deg <= 112.5) // currentWindDirection_deg >= 67.5 &&
   {
     strcpy(windDirectionString, "E");
   }
-  else if (currentWindDirection_deg > 112.5 || currentWindDirection_deg < 157.5)
+  else if (currentWindDirection_deg < 157.5) // currentWindDirection_deg > 112.5 &&
   {
     strcpy(windDirectionString, "SE");
   }
-  else if (currentWindDirection_deg >= 157.5 || currentWindDirection_deg <= 202.5)
+  else if (currentWindDirection_deg <= 202.5) // currentWindDirection_deg >= 157.5 &&
   {
     strcpy(windDirectionString, "S");
   }
-  else if (currentWindDirection_deg > 202.5 || currentWindDirection_deg < 247.5)
+  else if (currentWindDirection_deg < 247.5) // currentWindDirection_deg > 202.5 &&
   {
     strcpy(windDirectionString, "SW");
   }
-  else if (currentWindDirection_deg >= 247.5 || currentWindDirection_deg <= 292.5)
+  else if (currentWindDirection_deg <= 292.5) // currentWindDirection_deg >= 247.5 &&
   {
     strcpy(windDirectionString, "W");
   }
-  else if (currentWindDirection_deg > 292.5 || currentWindDirection_deg < 337.5)
+  else if (currentWindDirection_deg < 337.5) // currentWindDirection_deg > 292.5 &&
   {
     strcpy(windDirectionString, "NW");
   }
-  snprintf(current_weather_layer_buffer, sizeof(current_weather_layer_buffer), "%dF %d%s %s", 
-          (int)getFahrenheitFromCelsius(currentTemperature_c), 
-          (int)currentWindSpeed_kts, 
+  snprintf(current_weather_layer_buffer, sizeof(current_weather_layer_buffer), "%s %d%s %s", 
+          currentTemperatureString, 
+          (int)getPreferedWindSpeed(currentWindSpeed_kts), 
           windDirectionString,
           currentConditions);
-  // %03d@%d (int)currentWindDirection_deg, 
   text_layer_set_text(s_weather_current_layer, current_weather_layer_buffer);
 
   // Update Labels for which Forecast Day
@@ -278,15 +344,35 @@ static void update_weather()
   }
 
   // Update Today's Weather Condition
-  snprintf(day1_layer_buffer, sizeof(day1_layer_buffer), "%d/%dF %s", 
-          (int)getFahrenheitFromCelsius(currentLowTemperature_c), (int)getFahrenheitFromCelsius(currentHighTemperature_c),
-          currentDayForecastConditions);
+  switch(temperatureUnits)
+  {
+    case TEMPERATURE_UNITS_F:
+      snprintf(day1_layer_buffer, sizeof(day1_layer_buffer), "%d/%dF %s", 
+              (int)getFahrenheitFromCelsius(currentLowTemperature_c), (int)getFahrenheitFromCelsius(currentHighTemperature_c),
+              currentDayForecastConditions);
+      break;
+    case TEMPERATURE_UNITS_C:
+      snprintf(day1_layer_buffer, sizeof(day1_layer_buffer), "%d/%dC %s", 
+              currentLowTemperature_c, currentHighTemperature_c,
+              currentDayForecastConditions);
+      break;
+  }
   text_layer_set_text(s_weather_forecast1_layer, day1_layer_buffer);
 
   // Update Tomorrow's Weather Condition
-  snprintf(day2_layer_buffer, sizeof(day2_layer_buffer), "%d/%dF %s", 
-           (int)getFahrenheitFromCelsius(forecastLowTemperature_c), (int)getFahrenheitFromCelsius(forecastHighTemperature_c),
-           forecastConditions);
+  switch(temperatureUnits)
+  {
+    case TEMPERATURE_UNITS_F:
+      snprintf(day2_layer_buffer, sizeof(day2_layer_buffer), "%d/%dF %s", 
+               (int)getFahrenheitFromCelsius(forecastLowTemperature_c), (int)getFahrenheitFromCelsius(forecastHighTemperature_c),
+               forecastConditions);
+      break;
+    case TEMPERATURE_UNITS_C:
+      snprintf(day2_layer_buffer, sizeof(day2_layer_buffer), "%d/%dC %s", 
+               forecastLowTemperature_c, forecastHighTemperature_c,
+               forecastConditions);
+      break;
+  }
   text_layer_set_text(s_weather_forecast2_layer, day2_layer_buffer);
 }
 
@@ -573,6 +659,42 @@ static void main_window_load(Window *window)
     forecastConditions[0] = 0;
   }
 
+  if (persist_exists(STORAGE_KEY_TEMPERATURE_UNITS))
+  {
+    temperatureUnits = persist_read_int(STORAGE_KEY_TEMPERATURE_UNITS); 
+  }
+  else
+  {
+    temperatureUnits = TEMPERATURE_UNITS_F;
+  }
+  
+  if (persist_exists(STORAGE_KEY_WINDSPEED_UNITS))
+  {
+    windSpeedUnits = persist_read_int(STORAGE_KEY_WINDSPEED_UNITS);
+  }
+  else
+  {
+    windSpeedUnits = WINDSPEED_UNITS_KNOTS;
+  }
+  
+  if (persist_exists(STORAGE_KEY_WEEKNUMBER_ENABLED))
+  {
+    weekNumberEnabled = persist_read_int(STORAGE_KEY_WEEKNUMBER_ENABLED);
+  }
+  else
+  {
+    weekNumberEnabled = FALSE;
+  }
+  
+  if (persist_exists(STORAGE_KEY_MONDAY_FIRST))
+  {
+    mondayFirst = persist_read_int(STORAGE_KEY_MONDAY_FIRST);
+  }
+  else
+  {
+    mondayFirst = FALSE;
+  }
+
   // Do an immediate update for all the layers.
   time_t currentTime = time(NULL);
   struct tm *tick_time = localtime(&currentTime);
@@ -601,6 +723,12 @@ static void main_window_unload(Window *window)
   persist_write_int(STORAGE_KEY_FORECAST_LOW_C, forecastLowTemperature_c);
   persist_write_int(STORAGE_KEY_FORECAST_HIGH_C, forecastHighTemperature_c);
   persist_write_string(STORAGE_KEY_FORECAST_CONDITIONS, forecastConditions);
+  
+  // Record configuration settings.
+  persist_write_int(STORAGE_KEY_TEMPERATURE_UNITS, temperatureUnits);
+  persist_write_int(STORAGE_KEY_WINDSPEED_UNITS, windSpeedUnits);
+  persist_write_int(STORAGE_KEY_WEEKNUMBER_ENABLED, weekNumberEnabled);
+  persist_write_int(STORAGE_KEY_MONDAY_FIRST, mondayFirst);
                        
   // Destroy Layers
   text_layer_destroy(s_battery_layer);
@@ -772,6 +900,50 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         break;
       case KEY_DAY3_TEMP_MAX:
         day3HighTemperature_c = t->value->int32;
+        break;
+      case CONFIG_KEY_TEMPERATURE_UNITS:
+        if (strcmp(t->value->cstring, "F") == 0)
+        {
+          temperatureUnits = TEMPERATURE_UNITS_F;
+        }
+        else if (strcmp(t->value->cstring, "C") == 0)
+        {
+          temperatureUnits = TEMPERATURE_UNITS_C;
+        }
+        break;
+      case CONFIG_KEY_WINDSPEED_UNITS:
+        if (strcmp(t->value->cstring, "KNOTS") == 0)
+        {
+          windSpeedUnits = WINDSPEED_UNITS_KNOTS;
+        }
+        else if (strcmp(t->value->cstring, "MPH") == 0)
+        {
+          windSpeedUnits = WINDSPEED_UNITS_MPH;
+        }
+        else if (strcmp(t->value->cstring, "KPH") == 0)
+        {
+          windSpeedUnits = WINDSPEED_UNITS_KPH;
+        }
+        break;
+      case CONFIG_KEY_WEEKNUMBER_ENABLED:
+        if (strcmp(t->value->cstring, "DISABLED") == 0)
+        {
+          weekNumberEnabled = FALSE;
+        }
+        else if (strcmp(t->value->cstring, "ENABLED") == 0)
+        {
+          weekNumberEnabled = TRUE;
+        }
+        break;
+      case CONFIG_KEY_MONDAY_FIRST:
+        if (strcmp(t->value->cstring, "DISABLED") == 0)
+        {
+          mondayFirst = FALSE;
+        }
+        else
+        {
+          mondayFirst = TRUE;
+        }
         break;
       default:
         APP_LOG(APP_LOG_LEVEL_ERROR, "Key %d not recognized!", (int)t->key);

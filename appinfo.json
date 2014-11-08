@@ -1,5 +1,9 @@
 {
     "appKeys": {
+        "CONFIG_KEY_MONDAY_FIRST": 53,
+        "CONFIG_KEY_TEMPERATURE_UNITS": 50,
+        "CONFIG_KEY_WEEKNUMBER_ENABLED": 52,
+        "CONFIG_KEY_WINDSPEED_UNITS": 51,
         "KEY_CONDITIONS": 1,
         "KEY_DAY1_CONDITIONS": 8,
         "KEY_DAY1_TEMP_MAX": 10,
