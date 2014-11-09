@@ -50,13 +50,12 @@
 #define NUMBER_OF_SECONDS_UNTIL_DATA_CONSIDERED_LOST 60
 #define NUMBER_OF_SECONDS_TO_SHOW_SECONDS_AFTER_TAP 180
 
+// Constants for Settings
 #define TEMPERATURE_UNITS_F 0
 #define TEMPERATURE_UNITS_C 1
-  
 #define WINDSPEED_UNITS_KNOTS 0
 #define WINDSPEED_UNITS_MPH 1
 #define WINDSPEED_UNITS_KPH 2
-  
 #define FALSE 0
 #define TRUE 1
   
@@ -154,9 +153,6 @@ static void update_link_label()
 
 static void update_time(struct tm *tick_time)
 {
-  //time_t currentTime = time(NULL);
-  //struct tm *tick_time = localtime(&currentTime);
-
   static char timeBuffer[6]; // = "24:00";
   static char timeAmPmBuffer[3]; // = "am";
   static char timeSecondsBuffer[3];
@@ -179,6 +175,7 @@ static void update_time(struct tm *tick_time)
     strftime(timeBuffer, sizeof("00:00"), "%l:%M", tick_time);
     text_layer_set_text(s_time_layer, timeBuffer);
   
+    // Update the seconds field.
     if (weekNumberEnabled == TRUE)
     {
       // Show Week Number in place of the seconds field.
@@ -237,11 +234,22 @@ static void update_date(struct tm *tick_time)
   int dayOfWeek = atoi(dayOfWeekString);
   if (mondayFirst == TRUE)
   {
+    // %w reports Sunday first, subtract by 1 to have Monday first.
     dayOfWeek = dayOfWeek - 1;
   }
   
   // Subtract back to Sunday of this week.
   time_t calendarDate = time(NULL) - (86400 * dayOfWeek);
+
+  if ((mondayFirst == TRUE) && (dayOfWeek == -1))
+  {
+    // If configured for Monday first and we're on Sunday, then
+    // we need to wrap around to the end of the week for it to be
+    // displayed properly.
+    calendarDate -= (86400 * 7);
+    dayOfWeek = 6;
+  }
+
   struct tm *calendarDate_time = localtime(&calendarDate);
 
   // Update labels for the next 2 weeks.
@@ -416,150 +424,9 @@ static void request_weather()
 
 static void main_window_load(Window *window)
 {
-  // 144 wide
-  // GRect: x position, y position, x size, y size
-  
-  // Create Battery TextLayer
-  s_battery_layer = text_layer_create(GRect(0, 0, 50, 16));
-  text_layer_set_background_color(s_battery_layer, GColorBlack);
-  text_layer_set_text_color(s_battery_layer, GColorWhite);
-  text_layer_set_font(s_battery_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD));
-  text_layer_set_text_alignment(s_battery_layer, GTextAlignmentLeft);
-  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_battery_layer));
-    
-  // Create Link Status TextLayer
-  s_linkStatus_layer = text_layer_create(GRect(50, 0, 94, 16));
-  text_layer_set_background_color(s_linkStatus_layer, GColorBlack);
-  text_layer_set_text_color(s_linkStatus_layer, GColorWhite);
-  text_layer_set_font(s_linkStatus_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD));
-  text_layer_set_text_alignment(s_linkStatus_layer, GTextAlignmentLeft);
-  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_linkStatus_layer));
-  
-  // Create Time TextLayer
-  if (clock_is_24h_style())
-  {
-    s_time_layer = text_layer_create(GRect(0, 10, 125, 50));
-  }
-  else
-  {
-    s_time_layer = text_layer_create(GRect(0, 10, 118, 50));
-  }
-  text_layer_set_background_color(s_time_layer, GColorClear);
-  text_layer_set_text_color(s_time_layer, GColorBlack);
-  text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD));
-  text_layer_set_text_alignment(s_time_layer, GTextAlignmentRight);
-  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_time_layer));
-  
-  // Create AM/PM TextLayer
-  s_time_am_pm_layer = text_layer_create(GRect(120, 16, 24, 18));
-  text_layer_set_background_color(s_time_am_pm_layer, GColorClear);
-  text_layer_set_text_color(s_time_am_pm_layer, GColorBlack);
-  text_layer_set_font(s_time_am_pm_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
-  text_layer_set_text_alignment(s_time_am_pm_layer, GTextAlignmentLeft);
-  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_time_am_pm_layer));
-  
-  // Create Seconds TextLayer
-  s_time_seconds_layer = text_layer_create(GRect(120, 33, 24, 18));
-  text_layer_set_background_color(s_time_seconds_layer, GColorClear);
-  text_layer_set_text_color(s_time_seconds_layer, GColorBlack);
-  text_layer_set_font(s_time_seconds_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
-  text_layer_set_text_alignment(s_time_seconds_layer, GTextAlignmentLeft);
-  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_time_seconds_layer));
-  
-  // Create Date TextLayer
-  s_date_layer = text_layer_create(GRect(0, 48, 144, 28)); // 0, 43, 144, 28
-  text_layer_set_background_color(s_date_layer, GColorClear);
-  text_layer_set_text_color(s_date_layer, GColorBlack);
-  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
-  text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
-  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_date_layer));
-  
-  // Create Current Weather Layer
-  s_weather_current_layer = text_layer_create(GRect(2, 73, 142, 20)); // 0, 65, 144, 20
-  text_layer_set_background_color(s_weather_current_layer, GColorClear);
-  text_layer_set_text_color(s_weather_current_layer, GColorBlack);
-  text_layer_set_font(s_weather_current_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
-  text_layer_set_text_alignment(s_weather_current_layer, GTextAlignmentLeft);
-  text_layer_set_text(s_weather_current_layer, "");
-  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_weather_current_layer));
-  
-  // Create Today's Forecast Label Layer
-  s_weather_label1_layer = text_layer_create(GRect(2, 90, 25, 20)); // 0, 113, 35, 20
-  text_layer_set_background_color(s_weather_label1_layer, GColorClear);
-  text_layer_set_text_color(s_weather_label1_layer, GColorBlack);
-  text_layer_set_font(s_weather_label1_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
-  text_layer_set_text_alignment(s_weather_label1_layer, GTextAlignmentLeft);
-  text_layer_set_text(s_weather_label1_layer, "");
-  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_weather_label1_layer));
- 
-  // Create Today's Forecast Layer
-  s_weather_forecast1_layer = text_layer_create(GRect(25, 90, 119, 20)); // 0, 81, 144, 20
-  text_layer_set_background_color(s_weather_forecast1_layer, GColorClear);
-  text_layer_set_text_color(s_weather_forecast1_layer, GColorBlack);
-  text_layer_set_font(s_weather_forecast1_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
-  text_layer_set_text_alignment(s_weather_forecast1_layer, GTextAlignmentLeft);
-  text_layer_set_text(s_weather_forecast1_layer, "");
-  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_weather_forecast1_layer));
-
-  // Create Tomorrow's Forecast Label Layer
-  s_weather_label2_layer = text_layer_create(GRect(2, 107, 25, 20)); // 0, 113, 35, 20
-  text_layer_set_background_color(s_weather_label2_layer, GColorClear);
-  text_layer_set_text_color(s_weather_label2_layer, GColorBlack);
-  text_layer_set_font(s_weather_label2_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
-  text_layer_set_text_alignment(s_weather_label2_layer, GTextAlignmentLeft);
-  text_layer_set_text(s_weather_label2_layer, "");
-  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_weather_label2_layer));
-
-  // Create Tomorrow's Forecast Layer
-  s_weather_forecast2_layer = text_layer_create(GRect(25, 107, 119, 20)); // 35, 113, 109, 20
-  text_layer_set_background_color(s_weather_forecast2_layer, GColorClear);
-  text_layer_set_text_color(s_weather_forecast2_layer, GColorBlack);
-  text_layer_set_font(s_weather_forecast2_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
-  text_layer_set_text_alignment(s_weather_forecast2_layer, GTextAlignmentLeft);
-  text_layer_set_text(s_weather_forecast2_layer, "");
-  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_weather_forecast2_layer));
-  
-  // Create Calendar Layers
-  int calendarX = 0;
-  int calendarY = 132;
-  for (int dayLoop = 0; dayLoop < 14; dayLoop++)
-  {
-    if (dayLoop == 0 || dayLoop == 7)
-    {
-      calendarX = 0;
-    }
-    else if (dayLoop == 6 || dayLoop == 13)
-    {
-      calendarX = 124;
-    }
-    else if (dayLoop < 7)
-    {
-      calendarX = 2 + dayLoop * 20;
-    }
-    else
-    {
-      calendarX = 2 + (dayLoop - 7) * 20;
-    }
-    if (dayLoop < 7)
-    {
-      calendarY = 132;
-    }
-    else
-    {
-      calendarY = 150;
-    }
-    s_calendarDay_layer[dayLoop] = text_layer_create(GRect(calendarX, calendarY, 20, 20));
-    text_layer_set_background_color(s_calendarDay_layer[dayLoop], GColorBlack);
-    text_layer_set_text_color(s_calendarDay_layer[dayLoop], GColorWhite);
-    text_layer_set_font(s_calendarDay_layer[dayLoop], fonts_get_system_font(FONT_KEY_GOTHIC_18)); // FONT_KEY_GOTHIC_18
-    text_layer_set_text_alignment(s_calendarDay_layer[dayLoop], GTextAlignmentCenter);
-    text_layer_set_text(s_calendarDay_layer[dayLoop], "-");
-    layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_calendarDay_layer[dayLoop]));
-    calendarX += 22;
-  }
-  
-  // Recover saved weather conditions. We will re-query weather, but this
-  // is important if we don't have a data connection when the app reopens.
+  // Recover saved weather conditions and configuration options.
+  // We will re-query weather, but this is important if we don't
+  // have a data connection when the app reopens.
   if (persist_exists(STORAGE_KEY_CURRENT_TEMPERATURE_C))
   {
     currentTemperature_c = persist_read_int(STORAGE_KEY_CURRENT_TEMPERATURE_C);
@@ -695,6 +562,176 @@ static void main_window_load(Window *window)
     mondayFirst = FALSE;
   }
 
+  // 144 wide
+  // GRect: x position, y position, x size, y size
+  
+  // Create Battery TextLayer
+  s_battery_layer = text_layer_create(GRect(0, 0, 50, 16));
+  text_layer_set_background_color(s_battery_layer, GColorBlack);
+  text_layer_set_text_color(s_battery_layer, GColorWhite);
+  text_layer_set_font(s_battery_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD));
+  text_layer_set_text_alignment(s_battery_layer, GTextAlignmentLeft);
+  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_battery_layer));
+    
+  // Create Link Status TextLayer
+  s_linkStatus_layer = text_layer_create(GRect(50, 0, 94, 16));
+  text_layer_set_background_color(s_linkStatus_layer, GColorBlack);
+  text_layer_set_text_color(s_linkStatus_layer, GColorWhite);
+  text_layer_set_font(s_linkStatus_layer, fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD));
+  text_layer_set_text_alignment(s_linkStatus_layer, GTextAlignmentLeft);
+  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_linkStatus_layer));
+  
+  // Create Time TextLayer
+  if (clock_is_24h_style())
+  {
+    s_time_layer = text_layer_create(GRect(0, 10, 125, 50));
+  }
+  else
+  {
+    s_time_layer = text_layer_create(GRect(0, 10, 118, 50));
+  }
+  text_layer_set_background_color(s_time_layer, GColorClear);
+  text_layer_set_text_color(s_time_layer, GColorBlack);
+  text_layer_set_font(s_time_layer, fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD));
+  text_layer_set_text_alignment(s_time_layer, GTextAlignmentRight);
+  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_time_layer));
+  
+  // Create AM/PM TextLayer
+  s_time_am_pm_layer = text_layer_create(GRect(120, 16, 24, 18));
+  text_layer_set_background_color(s_time_am_pm_layer, GColorClear);
+  text_layer_set_text_color(s_time_am_pm_layer, GColorBlack);
+  text_layer_set_font(s_time_am_pm_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
+  text_layer_set_text_alignment(s_time_am_pm_layer, GTextAlignmentLeft);
+  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_time_am_pm_layer));
+  
+  // Create Seconds TextLayer
+  s_time_seconds_layer = text_layer_create(GRect(120, 33, 24, 18));
+  text_layer_set_background_color(s_time_seconds_layer, GColorClear);
+  text_layer_set_text_color(s_time_seconds_layer, GColorBlack);
+  text_layer_set_font(s_time_seconds_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
+  text_layer_set_text_alignment(s_time_seconds_layer, GTextAlignmentLeft);
+  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_time_seconds_layer));
+  
+  // Create Date TextLayer
+  s_date_layer = text_layer_create(GRect(0, 48, 144, 28)); // 0, 43, 144, 28
+  text_layer_set_background_color(s_date_layer, GColorClear);
+  text_layer_set_text_color(s_date_layer, GColorBlack);
+  text_layer_set_font(s_date_layer, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD));
+  text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
+  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_date_layer));
+  
+  // Create Current Weather Layer
+  s_weather_current_layer = text_layer_create(GRect(2, 73, 142, 20)); // 0, 65, 144, 20
+  text_layer_set_background_color(s_weather_current_layer, GColorClear);
+  text_layer_set_text_color(s_weather_current_layer, GColorBlack);
+  text_layer_set_font(s_weather_current_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+  text_layer_set_text_alignment(s_weather_current_layer, GTextAlignmentLeft);
+  text_layer_set_text(s_weather_current_layer, "");
+  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_weather_current_layer));
+  
+  // Create Today's Forecast Label Layer
+  s_weather_label1_layer = text_layer_create(GRect(2, 90, 25, 20)); // 0, 113, 35, 20
+  text_layer_set_background_color(s_weather_label1_layer, GColorClear);
+  text_layer_set_text_color(s_weather_label1_layer, GColorBlack);
+  text_layer_set_font(s_weather_label1_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
+  text_layer_set_text_alignment(s_weather_label1_layer, GTextAlignmentLeft);
+  text_layer_set_text(s_weather_label1_layer, "");
+  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_weather_label1_layer));
+ 
+  // Create Today's Forecast Layer
+  s_weather_forecast1_layer = text_layer_create(GRect(25, 90, 119, 20)); // 0, 81, 144, 20
+  text_layer_set_background_color(s_weather_forecast1_layer, GColorClear);
+  text_layer_set_text_color(s_weather_forecast1_layer, GColorBlack);
+  text_layer_set_font(s_weather_forecast1_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+  text_layer_set_text_alignment(s_weather_forecast1_layer, GTextAlignmentLeft);
+  text_layer_set_text(s_weather_forecast1_layer, "");
+  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_weather_forecast1_layer));
+
+  // Create Tomorrow's Forecast Label Layer
+  s_weather_label2_layer = text_layer_create(GRect(2, 107, 25, 20)); // 0, 113, 35, 20
+  text_layer_set_background_color(s_weather_label2_layer, GColorClear);
+  text_layer_set_text_color(s_weather_label2_layer, GColorBlack);
+  text_layer_set_font(s_weather_label2_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
+  text_layer_set_text_alignment(s_weather_label2_layer, GTextAlignmentLeft);
+  text_layer_set_text(s_weather_label2_layer, "");
+  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_weather_label2_layer));
+
+  // Create Tomorrow's Forecast Layer
+  s_weather_forecast2_layer = text_layer_create(GRect(25, 107, 119, 20)); // 35, 113, 109, 20
+  text_layer_set_background_color(s_weather_forecast2_layer, GColorClear);
+  text_layer_set_text_color(s_weather_forecast2_layer, GColorBlack);
+  text_layer_set_font(s_weather_forecast2_layer, fonts_get_system_font(FONT_KEY_GOTHIC_18));
+  text_layer_set_text_alignment(s_weather_forecast2_layer, GTextAlignmentLeft);
+  text_layer_set_text(s_weather_forecast2_layer, "");
+  layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_weather_forecast2_layer));
+  
+  // Create Calendar Layers
+  int calendarX = 0;
+  int calendarY = 132;
+  for (int dayLoop = 0; dayLoop < 14; dayLoop++)
+  {
+    if (mondayFirst)
+    {
+      // Monday through Sunday Layout
+      // Have a gap between Friday/Saturday
+      if (dayLoop == 5 || dayLoop == 12)
+      {
+        calendarX = 104;
+      }
+      else if (dayLoop == 6 || dayLoop == 13)
+      {
+        calendarX = 124;
+      }
+      else if (dayLoop < 5)
+      {
+        calendarX = dayLoop * 20;
+      }
+      else
+      {
+        calendarX = (dayLoop - 7) * 20;
+      }
+    }
+    else
+    {
+      // Sunday through Saturday Layout
+      // Have a gap between Sunday/Monday and Friday/Saturday
+      if (dayLoop == 0 || dayLoop == 7)
+      {
+        calendarX = 0;
+      }
+      else if (dayLoop == 6 || dayLoop == 13)
+      {
+        calendarX = 124;
+      }
+      else if (dayLoop < 7)
+      {
+        calendarX = 2 + dayLoop * 20;
+      }
+      else
+      {
+        calendarX = 2 + (dayLoop - 7) * 20;
+      }
+    }
+
+    if (dayLoop < 7)
+    {
+      calendarY = 132;
+    }
+    else
+    {
+      calendarY = 150;
+    }
+    
+    s_calendarDay_layer[dayLoop] = text_layer_create(GRect(calendarX, calendarY, 20, 20));
+    text_layer_set_background_color(s_calendarDay_layer[dayLoop], GColorBlack);
+    text_layer_set_text_color(s_calendarDay_layer[dayLoop], GColorWhite);
+    text_layer_set_font(s_calendarDay_layer[dayLoop], fonts_get_system_font(FONT_KEY_GOTHIC_18)); // FONT_KEY_GOTHIC_18
+    text_layer_set_text_alignment(s_calendarDay_layer[dayLoop], GTextAlignmentCenter);
+    text_layer_set_text(s_calendarDay_layer[dayLoop], "-");
+    layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_calendarDay_layer[dayLoop]));
+    calendarX += 22;
+  }
+  
   // Do an immediate update for all the layers.
   time_t currentTime = time(NULL);
   struct tm *tick_time = localtime(&currentTime);
@@ -729,7 +766,7 @@ static void main_window_unload(Window *window)
   persist_write_int(STORAGE_KEY_WINDSPEED_UNITS, windSpeedUnits);
   persist_write_int(STORAGE_KEY_WEEKNUMBER_ENABLED, weekNumberEnabled);
   persist_write_int(STORAGE_KEY_MONDAY_FIRST, mondayFirst);
-                       
+
   // Destroy Layers
   text_layer_destroy(s_battery_layer);
   text_layer_destroy(s_linkStatus_layer);
@@ -940,7 +977,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
         {
           mondayFirst = FALSE;
         }
-        else
+        else if (strcmp(t->value->cstring, "ENABLED") == 0)
         {
           mondayFirst = TRUE;
         }
@@ -1023,14 +1060,14 @@ static void accel_tap_handler(AccelAxisType axis, int32_t direction)
   // life of barely 3 days. Not showing seconds (updating only once
   // per minute) resulted in a battery life of 5 days.
   // As a compromise, if our watch gets a tap then we'll show seconds
-  // for 5 minutes. In the middle of the night we won't waste
+  // for 3 minutes. In the middle of the night we won't waste
   // processing on seconds but when we need seconds for exact timing
   // it's just a flick of a wrist to see them.
   
   timeOfLastTap = time(NULL);
   
   // The 24 HR clock never shows seconds.
-  if (!clock_is_24h_style())
+  if ((weekNumberEnabled == FALSE) && !clock_is_24h_style())
   {
     if (!isShowingSeconds)
     {
