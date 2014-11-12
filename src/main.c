@@ -34,7 +34,7 @@
 #define STORAGE_KEY_CURRENT_LOW_C 102
 #define STORAGE_KEY_CURRENT_HIGH_C 103
 #define STORAGE_KEY_CURRENT_WIND_DIR_DEG 104
-#define STORAGE_KEY_CURRENT_WIND_SPD_KTS 105
+#define STORAGE_KEY_CURRENT_WIND_SPD_METERSPERSECOND 105
 #define STORAGE_KEY_CURRENT_DAY 106
 #define STORAGE_KEY_FORECAST_LOW_C 107
 #define STORAGE_KEY_FORECAST_HIGH_C 108
@@ -66,7 +66,7 @@ static char currentDayForecastConditions[32];
 static int currentLowTemperature_c;
 static int currentHighTemperature_c;
 static int currentWindDirection_deg;
-static int currentWindSpeed_kts;
+static int currentWindSpeed_metersPerSecond;
 static int currentDate;
 static int forecastLowTemperature_c;
 static int forecastHighTemperature_c;
@@ -100,30 +100,31 @@ static TextLayer *s_weather_label2_layer;
 static TextLayer *s_weather_forecast2_layer;
 static TextLayer *s_calendarDay_layer[14];
 
-static float getFahrenheitFromCelsius(float temp_celsius)
+static int getFahrenheitFromCelsius(int temp_celsius)
 {
-  return ((temp_celsius * 9 / 5) + 32.0);
+  // Use only whole numbers in math operations. The Pebble watch
+  // hardware does not support floats, and floating operations
+  // are expensive to emulate (processing and memory).
+  return ((temp_celsius * 9 / 5) + 32);
 }
 
-static float getKnotsFromMetersPerSecond(float speed_metersPerSecond)
+static int getPreferedWindSpeed(int windSpeed_metersPerSecond)
 {
-  return (speed_metersPerSecond * 1.94384);
-}
-
-static float getPreferedWindSpeed(float windSpeed_kts)
-{
+  // Use only whole numbers in math operations. The Pebble watch
+  // hardware does not support floats, and floating operations
+  // are expensive to emulate (processing and memory).
   switch(windSpeedUnits)
   {
     case WINDSPEED_UNITS_KNOTS:
-      return windSpeed_kts;
+      return (windSpeed_metersPerSecond * 194384 / 100000); // * 1.94384
     case WINDSPEED_UNITS_MPH:
-      return (windSpeed_kts * 1.15077945);
+      return (windSpeed_metersPerSecond * 223694 / 100000); // * 2.23694
     case WINDSPEED_UNITS_KPH:
-      return (windSpeed_kts * 1.85200);    
+      return (windSpeed_metersPerSecond * 36 / 10); // * 3.6
   }
   
   // Invalid windspeed units.
-  return windSpeed_kts;
+  return windSpeed_metersPerSecond;
 }
 
 static void update_link_label()
@@ -286,7 +287,7 @@ static void update_weather()
   {
     case TEMPERATURE_UNITS_F:
       snprintf(currentTemperatureString, sizeof(currentTemperatureString), "%dF",
-          (int)getFahrenheitFromCelsius(currentTemperature_c));     
+          getFahrenheitFromCelsius(currentTemperature_c));     
       break;
     case TEMPERATURE_UNITS_C:
       snprintf(currentTemperatureString, sizeof(currentTemperatureString), "%dC",
@@ -328,7 +329,7 @@ static void update_weather()
   }
   snprintf(current_weather_layer_buffer, sizeof(current_weather_layer_buffer), "%s %d%s %s", 
           currentTemperatureString, 
-          (int)getPreferedWindSpeed(currentWindSpeed_kts), 
+          getPreferedWindSpeed(currentWindSpeed_metersPerSecond), 
           windDirectionString,
           currentConditions);
   text_layer_set_text(s_weather_current_layer, current_weather_layer_buffer);
@@ -356,7 +357,7 @@ static void update_weather()
   {
     case TEMPERATURE_UNITS_F:
       snprintf(day1_layer_buffer, sizeof(day1_layer_buffer), "%d/%dF %s", 
-              (int)getFahrenheitFromCelsius(currentLowTemperature_c), (int)getFahrenheitFromCelsius(currentHighTemperature_c),
+              getFahrenheitFromCelsius(currentLowTemperature_c), getFahrenheitFromCelsius(currentHighTemperature_c),
               currentDayForecastConditions);
       break;
     case TEMPERATURE_UNITS_C:
@@ -372,7 +373,7 @@ static void update_weather()
   {
     case TEMPERATURE_UNITS_F:
       snprintf(day2_layer_buffer, sizeof(day2_layer_buffer), "%d/%dF %s", 
-               (int)getFahrenheitFromCelsius(forecastLowTemperature_c), (int)getFahrenheitFromCelsius(forecastHighTemperature_c),
+               getFahrenheitFromCelsius(forecastLowTemperature_c), getFahrenheitFromCelsius(forecastHighTemperature_c),
                forecastConditions);
       break;
     case TEMPERATURE_UNITS_C:
@@ -481,13 +482,13 @@ static void main_window_load(Window *window)
     currentWindDirection_deg = 0;
   }
   
-  if (persist_exists(STORAGE_KEY_CURRENT_WIND_SPD_KTS))
+  if (persist_exists(STORAGE_KEY_CURRENT_WIND_SPD_METERSPERSECOND))
   {
-    currentWindSpeed_kts = persist_read_int(STORAGE_KEY_CURRENT_WIND_SPD_KTS);
+    currentWindSpeed_metersPerSecond = persist_read_int(STORAGE_KEY_CURRENT_WIND_SPD_METERSPERSECOND);
   }
   else
   {
-    currentWindSpeed_kts = 0;
+    currentWindSpeed_metersPerSecond = 0;
   }
   
   if (persist_exists(STORAGE_KEY_CURRENT_DAY))
@@ -755,7 +756,7 @@ static void main_window_unload(Window *window)
   persist_write_int(STORAGE_KEY_CURRENT_LOW_C, currentLowTemperature_c);
   persist_write_int(STORAGE_KEY_CURRENT_HIGH_C, currentHighTemperature_c);
   persist_write_int(STORAGE_KEY_CURRENT_WIND_DIR_DEG, currentWindDirection_deg);
-  persist_write_int(STORAGE_KEY_CURRENT_WIND_SPD_KTS, currentWindSpeed_kts);
+  persist_write_int(STORAGE_KEY_CURRENT_WIND_SPD_METERSPERSECOND, currentWindSpeed_metersPerSecond);
   persist_write_int(STORAGE_KEY_CURRENT_DAY, currentDate);
   persist_write_int(STORAGE_KEY_FORECAST_LOW_C, forecastLowTemperature_c);
   persist_write_int(STORAGE_KEY_FORECAST_HIGH_C, forecastHighTemperature_c);
@@ -868,15 +869,15 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 //        break;
 //      case KEY_TEMP_MIN:
 //        // Not reliably low temperature.
-//        snprintf(temperatureMin_buffer, sizeof(temperatureMin_buffer), "%d", (int)getFahrenheitFromCelsius((float)t->value->int32));
+//        snprintf(temperatureMin_buffer, sizeof(temperatureMin_buffer), "%d", getFahrenheitFromCelsius(t->value->int32));
 //        break;
 //      case KEY_TEMP_MAX:
 //        // Not reliably high temperature.
-//        snprintf(temperatureMax_buffer, sizeof(temperatureMax_buffer), "%dF", (int)getFahrenheitFromCelsius((float)t->value->int32));
+//        snprintf(temperatureMax_buffer, sizeof(temperatureMax_buffer), "%dF", getFahrenheitFromCelsius(t->value->int32));
 //        break;
       case KEY_WIND_SPEED:
         // Reported in meters per second, convert to knots.
-        currentWindSpeed_kts = (int)getKnotsFromMetersPerSecond((float)t->value->int32);
+        currentWindSpeed_metersPerSecond = t->value->int32;
         break;
       case KEY_WIND_DIRECTION:
         currentWindDirection_deg = t->value->int32;
