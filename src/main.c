@@ -423,6 +423,83 @@ static void request_weather()
   app_message_outbox_send();
 }
 
+static void create_calendar_layers()
+{
+  int calendarX = 0;
+  int calendarY = 132;
+  for (int dayLoop = 0; dayLoop < 14; dayLoop++)
+  {
+    if (mondayFirst)
+    {
+      // Monday through Sunday Layout
+      // Have a gap between Friday/Saturday
+      if (dayLoop == 5 || dayLoop == 12)
+      {
+        calendarX = 104;
+      }
+      else if (dayLoop == 6 || dayLoop == 13)
+      {
+        calendarX = 124;
+      }
+      else if (dayLoop < 5)
+      {
+        calendarX = dayLoop * 20;
+      }
+      else
+      {
+        calendarX = (dayLoop - 7) * 20;
+      }
+    }
+    else
+    {
+      // Sunday through Saturday Layout
+      // Have a gap between Sunday/Monday and Friday/Saturday
+      if (dayLoop == 0 || dayLoop == 7)
+      {
+        calendarX = 0;
+      }
+      else if (dayLoop == 6 || dayLoop == 13)
+      {
+        calendarX = 124;
+      }
+      else if (dayLoop < 7)
+      {
+        calendarX = 2 + dayLoop * 20;
+      }
+      else
+      {
+        calendarX = 2 + (dayLoop - 7) * 20;
+      }
+    }
+
+    if (dayLoop < 7)
+    {
+      calendarY = 132;
+    }
+    else
+    {
+      calendarY = 150;
+    }
+    
+    s_calendarDay_layer[dayLoop] = text_layer_create(GRect(calendarX, calendarY, 20, 20));
+    text_layer_set_background_color(s_calendarDay_layer[dayLoop], GColorBlack);
+    text_layer_set_text_color(s_calendarDay_layer[dayLoop], GColorWhite);
+    text_layer_set_font(s_calendarDay_layer[dayLoop], fonts_get_system_font(FONT_KEY_GOTHIC_18)); // FONT_KEY_GOTHIC_18
+    text_layer_set_text_alignment(s_calendarDay_layer[dayLoop], GTextAlignmentCenter);
+    text_layer_set_text(s_calendarDay_layer[dayLoop], "-");
+    layer_add_child(window_get_root_layer(s_main_window), text_layer_get_layer(s_calendarDay_layer[dayLoop]));
+    calendarX += 22;
+  }
+}
+
+static void destroy_calendar_layers()
+{
+  for (int dayLoop = 0; dayLoop < 14; dayLoop++)
+  {
+    text_layer_destroy(s_calendarDay_layer[dayLoop]);
+  }
+}
+
 static void main_window_load(Window *window)
 {
   // Recover saved weather conditions and configuration options.
@@ -667,71 +744,7 @@ static void main_window_load(Window *window)
   layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_weather_forecast2_layer));
   
   // Create Calendar Layers
-  int calendarX = 0;
-  int calendarY = 132;
-  for (int dayLoop = 0; dayLoop < 14; dayLoop++)
-  {
-    if (mondayFirst)
-    {
-      // Monday through Sunday Layout
-      // Have a gap between Friday/Saturday
-      if (dayLoop == 5 || dayLoop == 12)
-      {
-        calendarX = 104;
-      }
-      else if (dayLoop == 6 || dayLoop == 13)
-      {
-        calendarX = 124;
-      }
-      else if (dayLoop < 5)
-      {
-        calendarX = dayLoop * 20;
-      }
-      else
-      {
-        calendarX = (dayLoop - 7) * 20;
-      }
-    }
-    else
-    {
-      // Sunday through Saturday Layout
-      // Have a gap between Sunday/Monday and Friday/Saturday
-      if (dayLoop == 0 || dayLoop == 7)
-      {
-        calendarX = 0;
-      }
-      else if (dayLoop == 6 || dayLoop == 13)
-      {
-        calendarX = 124;
-      }
-      else if (dayLoop < 7)
-      {
-        calendarX = 2 + dayLoop * 20;
-      }
-      else
-      {
-        calendarX = 2 + (dayLoop - 7) * 20;
-      }
-    }
-
-    if (dayLoop < 7)
-    {
-      calendarY = 132;
-    }
-    else
-    {
-      calendarY = 150;
-    }
-    
-    s_calendarDay_layer[dayLoop] = text_layer_create(GRect(calendarX, calendarY, 20, 20));
-    text_layer_set_background_color(s_calendarDay_layer[dayLoop], GColorBlack);
-    text_layer_set_text_color(s_calendarDay_layer[dayLoop], GColorWhite);
-    text_layer_set_font(s_calendarDay_layer[dayLoop], fonts_get_system_font(FONT_KEY_GOTHIC_18)); // FONT_KEY_GOTHIC_18
-    text_layer_set_text_alignment(s_calendarDay_layer[dayLoop], GTextAlignmentCenter);
-    text_layer_set_text(s_calendarDay_layer[dayLoop], "-");
-    layer_add_child(window_get_root_layer(window), text_layer_get_layer(s_calendarDay_layer[dayLoop]));
-    calendarX += 22;
-  }
+  create_calendar_layers();
   
   // Do an immediate update for all the layers.
   time_t currentTime = time(NULL);
@@ -780,10 +793,7 @@ static void main_window_unload(Window *window)
   text_layer_destroy(s_weather_forecast1_layer);
   text_layer_destroy(s_weather_label2_layer);
   text_layer_destroy(s_weather_forecast2_layer);
-  for (int dayLoop = 0; dayLoop < 14; dayLoop++)
-  {
-    text_layer_destroy(s_calendarDay_layer[dayLoop]);
-  }
+  destroy_calendar_layers();
 }
 
 // tick_handler may be called once per second or once per minute
@@ -854,6 +864,8 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   char day2Conditions[32];
   char day3Conditions[32];
 
+  bool recreateCalendarLayers = false;
+  
   // For all items
   while(t != NULL)
   {
@@ -976,10 +988,20 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
       case CONFIG_KEY_MONDAY_FIRST:
         if (strcmp(t->value->cstring, "DISABLED") == 0)
         {
+          if (mondayFirst == TRUE)
+          {
+            // Setting changed, flag to recreate the calendar layers.
+            recreateCalendarLayers = true;
+          }
           mondayFirst = FALSE;
         }
         else if (strcmp(t->value->cstring, "ENABLED") == 0)
         {
+          if (mondayFirst == FALSE)
+          {
+            // Setting changed, flag to recreate the calendar layers.
+            recreateCalendarLayers = true;
+          }
           mondayFirst = TRUE;
         }
         break;
@@ -1037,6 +1059,15 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     }
   } // (day1Date > 0)
 
+  if (recreateCalendarLayers)
+  {
+    destroy_calendar_layers();
+    create_calendar_layers();
+    time_t currentTime = time(NULL);
+    struct tm *tick_time = localtime(&currentTime);
+    update_date(tick_time);
+  }
+  
   update_weather();
 }
 
