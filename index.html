@@ -12,7 +12,7 @@
     <p>Temperature Units:
     <select id="key_temperature_units_select">
       <option value="F">F</option>
-      <option value="C">C</option>
+      <option value="C" selected>C</option>
     </select>
     </p>
 
@@ -43,6 +43,17 @@
     </p>
 
     <script>
+//      function getQueryVariable(variable)
+//      {
+//             var query = window.location.search.substring(1);
+//             var vars = query.split("&");
+//             for (var i=0;i<vars.length;i++) {
+//                     var pair = vars[i].split("=");
+//                     if(pair[0] == variable){return pair[1];}
+//             }
+//             return(false);
+//      }
+      
       //Setup to allow easy adding more options later
       function saveOptions() {
         var temperatureUnits = document.getElementById("key_temperature_units_select");
