@@ -1131,16 +1131,10 @@ static void init(void)
   // Show the window on the watch, with animated=true
   window_stack_push(s_main_window, true);
 
-  // 24-Hour clock doesn't show seconds, so save processing and
-  // only refresh once a minute.
-  if (clock_is_24h_style())
-  {
-    tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
-  }
-  else
-  {
-    tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
-  }
+  // Initially only subscribe at MINUTE_UNIT. If the user is in
+  // 12 HR mode and does a watch bump, then the timer will change
+  // to SECOND_UNIT for a brief period.
+  tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
 
   battery_state_service_subscribe(update_battery_state);
   bluetooth_connection_service_subscribe(update_bluetooth_state);
@@ -1159,6 +1153,7 @@ void deinit(void)
   tick_timer_service_unsubscribe();
   battery_state_service_unsubscribe();
   bluetooth_connection_service_unsubscribe();
+  accel_tap_service_unsubscribe();
   
   window_destroy(s_main_window);
 }
